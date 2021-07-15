@@ -1,9 +1,15 @@
 import mne
+from os.path import isdir
 
+if isdir("/home/jev"):
+    base_dir = "/home/jev/"
+elif isdir("/home/hannaj/"):
+    base_dir = "/home/hannaj/"
 
-subjects_dir = "/home/jev/freesurfer/subjects/"
-eeg_dir = "/home/jev/hdd/Memtacs_EEG/"
-n_jobs = 4
+subjects_dir = base_dir + "hdd/freesurfer/subjects/"
+eeg_dir = base_dir + "hdd/memtacs/proc/"
+
+n_jobs = 24
 
 
 # source space
@@ -12,10 +18,7 @@ source_space = mne.setup_source_space("fsaverage", subjects_dir=subjects_dir,
 mne.write_source_spaces("{}fsaverage-src.fif".format(eeg_dir), source_space)
 
 # get EEG as template
-raw = mne.io.read_raw_brainvision("{}MT-OG-232_TOM.vhdr".format(eeg_dir))
-raw.drop_channels(['Re', 'Li', 'Vo', 'Vu'])
-raw.set_montage("standard_1005")
-raw.save("{}OG-232-raw.fif".format(eeg_dir))
+raw = mne.io.Raw("{}template-raw.fif".format(eeg_dir))
 
 # bem
 surfs = mne.make_bem_model("fsaverage", subjects_dir=subjects_dir)
