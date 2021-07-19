@@ -14,8 +14,10 @@ raw_dir = base_dir + "hdd/memtacs/raw/"
 proc_dir = base_dir + "hdd/memtacs/proc/"
 
 l_freq, h_freq = 0.1, 250
+overwrite = True
 
 filelist = listdir(raw_dir)
+proclist = listdir(proc_dir)
 for filename in filelist:
     if isdir(raw_dir+filename): # subjects are organised by dir here
         subj_name = filename
@@ -25,8 +27,11 @@ for filename in filelist:
         for this_filename in this_filelist: # get every recording in this dir
             if ".vhdr" not in this_filename:
                 continue
-            raw = mne.io.read_raw_brainvision(this_path+this_filename,
-                                              preload=True)
+            try:
+                raw = mne.io.read_raw_brainvision(this_path+this_filename,
+                                                  preload=True)
+            except:
+                continue
 
             # set the channel types, so MNE knows what they are
             chan_dict = {"Vo":"eog","Vu":"eog","Re":"eog","Li":"eog"}
@@ -51,6 +56,7 @@ for filename in filelist:
 
             # filter
             raw.filter(l_freq=l_freq, h_freq=h_freq)
+            raw.notch_filter(np.arange(50, 251, 50))
             # set default channels locations
             raw.set_montage("standard_1005")
             # detect bad channels
@@ -73,6 +79,9 @@ for filename in filelist:
 
             annots = blink_annot + muscle_annot
             raw.set_annotations(annots)
+
+            raw.resample(250, n_jobs=4)
+
             raw.save("{}{}_{}-raw.fif".format(proc_dir, subj_name, set_idx),
-                     overwrite=True)
+                     overwrite=overwrite)
             set_idx += 1

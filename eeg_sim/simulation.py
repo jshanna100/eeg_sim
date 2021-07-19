@@ -37,7 +37,6 @@ reg_names = [r[0] for r in cnx_dict["Regions"]]
 wc = WCModel(Cmat=cnx, Dmat=cnx_d)
 
 wc.params['exc_ext'] = 0.65
-wc.params['signalV'] = 0
 wc.params['duration'] = 120 * 1000
 wc.params['sigma_ou'] = 0.14
 wc.params['K_gl'] = 3.15
