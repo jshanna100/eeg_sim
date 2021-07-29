@@ -80,8 +80,13 @@ for filename in filelist:
             annots = blink_annot + muscle_annot
             raw.set_annotations(annots)
 
+            # interpolate bad channels
+            raw.interpolate_bads()
+
+            # downsample to 250Hz
             raw.resample(250, n_jobs=4)
 
+            # save
             raw.save("{}{}_{}-raw.fif".format(proc_dir, subj_name, set_idx),
                      overwrite=overwrite)
             set_idx += 1
