@@ -14,6 +14,7 @@ def simulate_eeg(model, cnx, src, labels, fwd, info, scale_const,
 
     noise_std *= scale_const
     model.params["Cmat"] = cnx
+    print("\n\n{:.5f}\n\n".format(model.params["Cmat"][0,1]))
     model.run(chunkwise=True, append_outputs=True)
     stc_data = model.exc * scale_const
     tstep = model.params["sampling_dt"] / 1000
@@ -31,25 +32,28 @@ def simulate_sample(traj):
     samp_cnx = cnx_sample(cnx_dict, samp_n)
     raws = []
     for i in range(samp_n):
-        raw = simulate_eeg(model, samp_cnx[i], src, labels,
+        raw = simulate_eeg(model, samp_cnx[...,i], src, labels,
                            fwd, info, scale_const,
                            noise_std, return_stc=False)
         raws.append(raw)
     samples = build_band_samples(raws, bands, n_fft=500, log=True)
     distros = band_multivar_gauss_est(samples)
     kls = band_multivar_gauss_kl(distros, q_distro)
-    fitness = tuple(kls.values())
+    fitness = np.array(list(kls.values())).mean()
+    fitness = (fitness, )
     return fitness, model.outputs
 
 
 if isdir("/home/jev"):
-    root_dir = "/home/jev/"
+    root_dir = "/home/jev/hdd/"
 elif isdir("/home/hannaj/"):
-    root_dir = "/home/hannaj/"
+    root_dir = "/home/hannaj/hdd/"
+elif isdir("/home/jeffhanna/"):
+    root_dir = "/scratch/jeffhanna/"
 
-mat_dir = root_dir + "eeg_sim/mats/"
-eeg_dir = root_dir + "hdd/memtacs/proc/"
-subjects_dir = root_dir + "hdd/freesurfer/subjects/"
+mat_dir = "../mats/"
+eeg_dir = root_dir + "memtacs/proc/"
+subjects_dir = root_dir + "freesurfer/subjects/"
 
 with open("{}mats.pickle".format(mat_dir), "rb") as f:
     cnx_dict = pickle.load(f)
@@ -66,15 +70,15 @@ with open("{}empirical_distro.pickle".format(mat_dir), "rb") as f:
 
 # fixed hyper-parameters
 subsampling = 1000 / raw.info["sfreq"]
-samp_n = 2
-n_jobs = 4
+samp_n = 4
+n_jobs = 16
 noise_std = 0.2
 scale_const = 1e-8
 
 cnx = cnx_dict["cnx"]
 cnx_d = cnx_dict["cnx_delay"]
 reg_names = [r[0] for r in cnx_dict["Regions"]]
-bands = {"theta":(4,8), "alpha":(8,13), "beta":(13,31), "gamma":(30,100)}
+bands = {"theta":(4,8), "alpha":(8,13), "beta":(13,31)}
 
 labels = []
 for reg in reg_names:
@@ -92,19 +96,10 @@ for reg in reg_names:
 label_names = [label.name for label in labels]
 
 model = WCModel(Cmat=cnx, Dmat=cnx_d)
-model.params["duration"]= 300 * 1000
+model.params["duration"]= 30 * 1000
 model.params["dt"] = 0.5
 model.params["sampling_dt"] = subsampling
-# model.params["cnx_dict"] = cnx_dict
-# model.params["samp_n"] = samp_n
-# model.params["src"] = src
-# model.params["labels"] = labels
-# model.params["fwd"] = fwd
-# model.params["info"] = raw.info
-# model.params["q_distro"] = emp_distro
-# model.params["bands"] = bands
-# model.params["scale_const"] = 1e-8
-# model.params["noise_std"] = noise_std
+
 
 param_names = ["K_gl", "c_excexc", "c_excinh", "c_inhexc", "c_inhinh",
                "exc_ext", "inh_ext"]
@@ -113,6 +108,6 @@ param_vals = [[0.05, 2], [4, 32], [4, 32], [4, 32], [0.05, 8], [0.05, 4],
 
 pars = ParameterSpace(param_names, param_vals)
 evolution = Evolution(evalFunction=simulate_sample, parameterSpace=pars,
-                      weightList=[-1, -1, -1, -1], model=model, POP_INIT_SIZE=50,
-                      POP_SIZE=20, NGEN=20, ncores=8, filename="test.hdf")
+                      weightList=[-1.], model=model, POP_INIT_SIZE=50,
+                      POP_SIZE=30, NGEN=2, ncores=n_jobs, filename="test.hdf")
 evolution.run()

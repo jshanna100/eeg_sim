@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 def multivar_gauss_kl(p, q):
     mu_p, sigma_p, mu_q, sigma_q = p["mu"], p["sigma"], q["mu"], q["sigma"]
     dim_n = len(mu_p)
-    term_0 = np.log(np.linalg.det(sigma_q) / np.linalg.det(sigma_p))
+    term_0 = np.log(abs(np.linalg.det(sigma_q)) / abs(np.linalg.det(sigma_p)))
     diff = mu_p - mu_q
     term_1 = np.dot(diff, np.linalg.inv(sigma_q)).dot(diff)
     term_2 = np.trace(np.matmul(np.linalg.inv(sigma_q), sigma_p))
@@ -25,7 +25,9 @@ def band_multivar_gauss_kl(p_distros, q_distros):
 def multivar_gauss_est(samples):
     samp_vecs = np.stack(list(samples.values()))
     mu = samp_vecs.mean(axis=1)
-    sigma = np.dot(samp_vecs, samp_vecs.T) / samp_vecs.shape[1]
+    resid = samp_vecs - np.tile(np.expand_dims(mu, 0).T,
+                                (1, samp_vecs.shape[1]))
+    sigma = np.dot(resid, resid.T) / samp_vecs.shape[1]
     return {"mu":mu, "sigma":sigma}
 
 def band_multivar_gauss_est(band_samples):
