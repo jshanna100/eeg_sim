@@ -14,7 +14,6 @@ def simulate_eeg(model, cnx, src, labels, fwd, info, scale_const,
 
     noise_std *= scale_const
     model.params["Cmat"] = cnx
-    print("\n\n{:.5f}\n\n".format(model.params["Cmat"][0,1]))
     model.run(chunkwise=True, append_outputs=True)
     stc_data = model.exc * scale_const
     tstep = model.params["sampling_dt"] / 1000
@@ -70,8 +69,8 @@ with open("{}empirical_distro.pickle".format(mat_dir), "rb") as f:
 
 # fixed hyper-parameters
 subsampling = 1000 / raw.info["sfreq"]
-samp_n = 4
-n_jobs = 16
+samp_n = 64
+n_jobs = 32
 noise_std = 0.2
 scale_const = 1e-8
 
@@ -96,7 +95,7 @@ for reg in reg_names:
 label_names = [label.name for label in labels]
 
 model = WCModel(Cmat=cnx, Dmat=cnx_d)
-model.params["duration"]= 30 * 1000
+model.params["duration"]= 300 * 1000
 model.params["dt"] = 0.5
 model.params["sampling_dt"] = subsampling
 
