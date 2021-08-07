@@ -69,7 +69,7 @@ with open("{}empirical_distro.pickle".format(mat_dir), "rb") as f:
 
 # fixed hyper-parameters
 subsampling = 1000 / raw.info["sfreq"]
-samp_n = 64
+samp_n = 16
 n_jobs = 32
 noise_std = 0.2
 scale_const = 1e-8
@@ -107,6 +107,6 @@ param_vals = [[0.05, 2], [4, 32], [4, 32], [4, 32], [0.05, 8], [0.05, 4],
 
 pars = ParameterSpace(param_names, param_vals)
 evolution = Evolution(evalFunction=simulate_sample, parameterSpace=pars,
-                      weightList=[-1.], model=model, POP_INIT_SIZE=50,
-                      POP_SIZE=30, NGEN=2, ncores=n_jobs, filename="test.hdf")
+                      weightList=[-1.], model=model, POP_INIT_SIZE=4,
+                      POP_SIZE=4, NGEN=2, ncores=n_jobs, filename="test.hdf")
 evolution.run()

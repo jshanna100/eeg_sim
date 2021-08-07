@@ -18,6 +18,7 @@ eeg_dir = base_dir+"hdd/memtacs/proc/"
 n_jobs = 1
 bands = {"theta":(4,8), "alpha":(8,13), "beta":(13,31), "gamma":(30,100)}
 log = True
+subsamp = 16
 
 filenames = listdir(eeg_dir)
 raws = []
@@ -25,6 +26,10 @@ for filename in filenames:
     if "-raw.fif" not in filename:
         continue
     raws.append(mne.io.Raw(eeg_dir+filename))
+
+if subsamp:
+    subsamp_inds = np.random.randint(len(raws), size=subsamp)
+    raws = [raws[idx] for idx in subsamp_inds]
 
 samples = build_band_samples(raws, bands, n_jobs=n_jobs, n_fft=500, log=log)
 band_distros = band_multivar_gauss_est(samples)
