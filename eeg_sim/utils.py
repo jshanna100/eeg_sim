@@ -109,7 +109,7 @@ def plot_samples(output, bands, ch_names, xlim=(-3.5, 3.5)):
                              scale=std)
             x = np.linspace(this_norm.ppf(0.001), this_norm.ppf(0.999), 500)
             y = this_norm.pdf(x)
-            ax.hist(output[band][ch], density=True, alpha=0.5, bins=30)
+            ax.hist(output[band][ch], density=True, alpha=0.5)
             ax.plot(x, y)
             ax.set_xlim(xlim)
         plt.tight_layout()
