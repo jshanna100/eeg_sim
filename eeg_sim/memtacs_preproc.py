@@ -11,7 +11,7 @@ elif isdir("/home/hannaj/"):
     base_dir = "/home/hannaj/"
 
 raw_dir = base_dir + "hdd/memtacs/raw/"
-proc_dir = base_dir + "hdd/memtacs/proc/"
+proc_dir = base_dir + "hdd/memtacs/proc/light/"
 
 l_freq, h_freq = 0.1, 250
 overwrite = True
@@ -41,18 +41,18 @@ for filename in filelist:
 
             # reference the EOG channels against each other, add that as
             # eog_v, eog_h, then drop the original channels
-            data = np.empty((0,len(raw)))
-            eog_v_picks = mne.pick_channels(raw.ch_names, include=["Vo", "Vu"])
-            temp_data = raw.get_data()[eog_v_picks,]
-            data = np.vstack((data, temp_data[0,] - temp_data[1,]))
-            eog_h_picks = mne.pick_channels(raw.ch_names, include=["Re", "Li"])
-            temp_data = raw.get_data()[eog_h_picks,]
-            data = np.vstack((data, temp_data[0,] - temp_data[1,]))
-            info = mne.create_info(["eog_v","eog_h"], sfreq=raw.info["sfreq"],
-                                   ch_types=["eog","eog"])
-            non_eeg = mne.io.RawArray(data, info)
-            raw.add_channels([non_eeg], force_update_info=True)
-            raw.drop_channels(orig_chans)
+            # data = np.empty((0,len(raw)))
+            # eog_v_picks = mne.pick_channels(raw.ch_names, include=["Vo", "Vu"])
+            # temp_data = raw.get_data()[eog_v_picks,]
+            # data = np.vstack((data, temp_data[0,] - temp_data[1,]))
+            # eog_h_picks = mne.pick_channels(raw.ch_names, include=["Re", "Li"])
+            # temp_data = raw.get_data()[eog_h_picks,]
+            # data = np.vstack((data, temp_data[0,] - temp_data[1,]))
+            # info = mne.create_info(["eog_v","eog_h"], sfreq=raw.info["sfreq"],
+            #                        ch_types=["eog","eog"])
+            # non_eeg = mne.io.RawArray(data, info)
+            # raw.add_channels([non_eeg], force_update_info=True)
+            # raw.drop_channels(orig_chans)
 
             # filter
             raw.filter(l_freq=l_freq, h_freq=h_freq)
@@ -66,19 +66,19 @@ for filename in filelist:
             print(bad_chans)
             raw.info["bads"].extend(bad_chans)
 
-            ## identify artefacts
-            # EOG
-            eog_events = find_eog_events(raw)
-            onsets = eog_events[:, 0] / raw.info['sfreq'] - 0.25
-            durations = [0.5] * len(eog_events)
-            descriptions = ['bad blink'] * len(eog_events)
-            blink_annot = mne.Annotations(onsets, durations, descriptions)
+            # ## identify artefacts
+            # # EOG
+            # eog_events = find_eog_events(raw)
+            # onsets = eog_events[:, 0] / raw.info['sfreq'] - 0.25
+            # durations = [0.5] * len(eog_events)
+            # descriptions = ['bad blink'] * len(eog_events)
+            # blink_annot = mne.Annotations(onsets, durations, descriptions)
 
-            # muscle spasms
-            muscle_annot, muscle_scores = annotate_muscle_zscore(raw)
-
-            annots = blink_annot + muscle_annot
-            raw.set_annotations(annots)
+            # # muscle spasms
+            # muscle_annot, muscle_scores = annotate_muscle_zscore(raw)
+            #
+            # annots = blink_annot + muscle_annot
+            # raw.set_annotations(annots)
 
             # interpolate bad channels
             raw.interpolate_bads()

@@ -4,6 +4,22 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 
+def sigma2freq(sigma_min, sigma_max, samp_len, point_n, resolution=250):
+    freq_table = {}
+    sig_range = np.linspace(sigma_min, sigma_max, resolution)
+    for sig in sig_range:
+        y = sacc_wavelet(point_n, sig)
+        y /= y.max()
+        active = (y!=0).sum()
+        freq = (point_n / active) * samp_len
+        freq_table[sig] = freq
+    return freq_table
+
+def sacc_wavelet(point_n, sigma):
+    x = np.linspace(-0.5, 0.5, point_n)
+    y = x / (sigma**3 * np.sqrt(2 * np.pi)) * np.exp(-x**2 / 2 * sigma**2)
+    return y
+
 def multivar_gauss_kl(p, q):
     mu_p, sigma_p, mu_q, sigma_q = p["mu"], p["sigma"], q["mu"], q["sigma"]
     dim_n = len(mu_p)
