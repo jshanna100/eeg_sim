@@ -107,6 +107,6 @@ param_vals = [[0.05, 2], [4, 32], [4, 32], [4, 32], [0.05, 8], [0.05, 4],
 
 pars = ParameterSpace(param_names, param_vals)
 evolution = Evolution(evalFunction=simulate_sample, parameterSpace=pars,
-                      weightList=[-1.], model=model, POP_INIT_SIZE=4,
-                      POP_SIZE=4, NGEN=2, ncores=n_jobs, filename="test.hdf")
+                      weightList=[-1.], model=model, POP_INIT_SIZE=64,
+                      POP_SIZE=32, NGEN=20, ncores=n_jobs, filename="test.hdf")
 evolution.run()
