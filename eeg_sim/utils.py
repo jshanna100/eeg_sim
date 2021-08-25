@@ -74,6 +74,8 @@ def calc_bandpower(inst, picks, bands, n_fft=500, n_jobs=1, log=False):
     return output
 
 def build_band_samples(raws, bands, n_fft=500, log=False, n_jobs=1):
+    # for a list of raw files and a dictonary of frequency bands,
+    # calculate the band power for each channel
     output = {k:{} for k in bands.keys()}
     for raw in raws:
         ch_names = [raw.ch_names[idx] for idx in mne.pick_types(raw.info,

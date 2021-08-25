@@ -5,13 +5,25 @@ import numpy as np
 from anoar import BadChannelFind
 from mne.preprocessing import annotate_muscle_zscore, find_eog_events
 
+# Define directory. The if statements are here because I work on multiple
+# computers, and these automatically detect which one I'm using.
 if isdir("/home/jev"):
     base_dir = "/home/jev/"
 elif isdir("/home/hannaj/"):
     base_dir = "/home/hannaj/"
 
+# this has two modes. if do_reog, then prepare the data with an REOG channel
+# and without EOG/EMG artefact marking - this is for usage with wavelet_filter.py
+# if not do_reog, then create a normal EOG channel, and identify artefact segments.
+# this is for use with empirical_bandpower.py
+do_reog = True
+
 raw_dir = base_dir + "hdd/memtacs/raw/"
-proc_dir = base_dir + "hdd/memtacs/proc/light/"
+if do_reog:
+    proc_dir = base_dir + "hdd/memtacs/proc/reog/"
+else:
+    proc_dir = base_dir + "hdd/memtacs/proc/"
+
 
 l_freq, h_freq = 0.1, 250
 overwrite = True
@@ -39,20 +51,21 @@ for filename in filelist:
             for k,v in chan_dict.items():
                 raw.set_channel_types({k:v})
 
-            # reference the EOG channels against each other, add that as
-            # eog_v, eog_h, then drop the original channels
-            # data = np.empty((0,len(raw)))
-            # eog_v_picks = mne.pick_channels(raw.ch_names, include=["Vo", "Vu"])
-            # temp_data = raw.get_data()[eog_v_picks,]
-            # data = np.vstack((data, temp_data[0,] - temp_data[1,]))
-            # eog_h_picks = mne.pick_channels(raw.ch_names, include=["Re", "Li"])
-            # temp_data = raw.get_data()[eog_h_picks,]
-            # data = np.vstack((data, temp_data[0,] - temp_data[1,]))
-            # info = mne.create_info(["eog_v","eog_h"], sfreq=raw.info["sfreq"],
-            #                        ch_types=["eog","eog"])
-            # non_eeg = mne.io.RawArray(data, info)
-            # raw.add_channels([non_eeg], force_update_info=True)
-            # raw.drop_channels(orig_chans)
+            if not do_reog:
+                # reference the EOG channels against each other, add that as
+                eog_v, eog_h, then drop the original channels
+                data = np.empty((0,len(raw)))
+                eog_v_picks = mne.pick_channels(raw.ch_names, include=["Vo", "Vu"])
+                temp_data = raw.get_data()[eog_v_picks,]
+                data = np.vstack((data, temp_data[0,] - temp_data[1,]))
+                eog_h_picks = mne.pick_channels(raw.ch_names, include=["Re", "Li"])
+                temp_data = raw.get_data()[eog_h_picks,]
+                data = np.vstack((data, temp_data[0,] - temp_data[1,]))
+                info = mne.create_info(["eog_v","eog_h"], sfreq=raw.info["sfreq"],
+                                       ch_types=["eog","eog"])
+                non_eeg = mne.io.RawArray(data, info)
+                raw.add_channels([non_eeg], force_update_info=True)
+                raw.drop_channels(orig_chans)
 
             # filter
             raw.filter(l_freq=l_freq, h_freq=h_freq)
@@ -61,24 +74,24 @@ for filename in filelist:
             raw.set_montage("standard_1005")
             # detect bad channels
             picks = mne.pick_types(raw.info, eeg=True)
-            bcf = BadChannelFind(picks, thresh=0.5)
+            bcf = BadChannelFind(picks, thresh=0.8)
             bad_chans = bcf.recommend(raw)
             print(bad_chans)
             raw.info["bads"].extend(bad_chans)
 
-            # ## identify artefacts
-            # # EOG
-            # eog_events = find_eog_events(raw)
-            # onsets = eog_events[:, 0] / raw.info['sfreq'] - 0.25
-            # durations = [0.5] * len(eog_events)
-            # descriptions = ['bad blink'] * len(eog_events)
-            # blink_annot = mne.Annotations(onsets, durations, descriptions)
+            if not do_reog:
+                ## identify artefacts
+                # EOG
+                eog_events = find_eog_events(raw)
+                onsets = eog_events[:, 0] / raw.info['sfreq'] - 0.25
+                durations = [0.5] * len(eog_events)
+                descriptions = ['bad blink'] * len(eog_events)
+                blink_annot = mne.Annotations(onsets, durations, descriptions)
+                # muscle spasms
+                muscle_annot, muscle_scores = annotate_muscle_zscore(raw)
 
-            # # muscle spasms
-            # muscle_annot, muscle_scores = annotate_muscle_zscore(raw)
-            #
-            # annots = blink_annot + muscle_annot
-            # raw.set_annotations(annots)
+                annots = blink_annot + muscle_annot
+                raw.set_annotations(annots)
 
             # interpolate bad channels
             raw.interpolate_bads()
