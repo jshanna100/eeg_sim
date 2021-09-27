@@ -8,6 +8,7 @@ from utils import (cnx_sample, build_band_samples, band_multivar_gauss_kl,
 import mne
 import pickle
 from os.path import isdir
+import argparse
 
 def simulate_eeg(model, cnx, src, labels, fwd, info, scale_const,
                  noise_std, return_stc=False):
@@ -41,6 +42,12 @@ def simulate_sample(traj):
     fitness = np.array(list(kls.values())).mean()
     fitness = (fitness, )
     return fitness, model.outputs
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--pop_init', type=int, default=128)
+parser.add_argument('--pop', type=int, default=32)
+parser.add_argument('--n_gen', type=int, default=20)
+opt = parser.parse_args()
 
 
 if isdir("/home/jev"):
@@ -107,7 +114,8 @@ param_vals = [[0.05, 2], [4, 32], [4, 32], [4, 32], [0.05, 8], [0.05, 4],
 
 pars = ParameterSpace(param_names, param_vals)
 evolution = Evolution(evalFunction=simulate_sample, parameterSpace=pars,
-                      weightList=[-1.], model=model, POP_INIT_SIZE=64,
-                      POP_SIZE=32, NGEN=20, ncores=n_jobs), filename="test.hdf")
+                      weightList=[-1.], model=model, POP_INIT_SIZE=opt.pop_init,
+                      POP_SIZE=opt.pop, NGEN=opt.n_gen, ncores=n_jobs,
+                      filename="test.hdf")
 evolution.run()
 evolution.save()
