@@ -116,6 +116,6 @@ pars = ParameterSpace(param_names, param_vals)
 evolution = Evolution(evalFunction=simulate_sample, parameterSpace=pars,
                       weightList=[-1.], model=model, POP_INIT_SIZE=opt.pop_init,
                       POP_SIZE=opt.pop, NGEN=opt.n_gen, ncores=n_jobs,
-                      filename="test.hdf")
+                      filename="/scratch/jeffhanna/eeg_sim/test.hdf")
 evolution.run()
-evolution.save()
+evolution.saveEvolution()
