@@ -9,8 +9,7 @@ elif isdir("/home/hannaj/"):
 subjects_dir = base_dir + "hdd/freesurfer/subjects/"
 eeg_dir = base_dir + "hdd/memtacs/proc/"
 
-n_jobs = 24
-
+n_jobs = 8
 
 # source space
 source_space = mne.setup_source_space("fsaverage", subjects_dir=subjects_dir,
