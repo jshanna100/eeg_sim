@@ -1,4 +1,3 @@
-from scipy.signal import cwt, hilbert
 import numpy as np
 import mne
 import pywt
@@ -15,7 +14,7 @@ Catch and label micro-saccades. This should run on the results of
 memtacs_preproc.py with the do_reog variable set to True
 '''
 
-wavelet_scales = (0.2, 0.1) # 40-80Hz at a sampling rate of 250Hz
+wavelet_scales = (5, 2.5) # 40-80Hz at a sampling rate of 1000Hz
 
 # Define directory. The if statements are here because I work on multiple
 # computers, and these automatically detect which one I'm using.
@@ -39,7 +38,7 @@ for filename in filenames:
     raw = mne.io.Raw(eeg_dir+filename, preload=True)
 
     # create the REOG channel: EOG average - Pz
-    raw_eog = raw.copy().pick_types(eog=True)
+    raw_eog = raw.copy().pick_channels(["Re", "Li", "Vo", "Vu"])
     eog_data = raw.get_data().mean(axis=0, keepdims=True)
     pz = raw.copy().pick_channels(["Pz"]).get_data()
     reog_data = eog_data - pz
@@ -49,7 +48,7 @@ for filename in filenames:
 
     # wavelet transform
     coef, freqs = pywt.cwt(reog_data * -1, np.linspace(*wavelet_scales, 50),
-                           "gaus1", sampling_period=0.025)
+                           "gaus1", sampling_period=0.001)
     # add the results of the wavelet transform for later visualisation
     info = mne.create_info(["sacc_wav"], raw.info["sfreq"])
     coef_a = coef.mean(axis=0)
@@ -77,9 +76,9 @@ for filename in filenames:
     events = mne.events_from_annotations(raw, event_id={"Micro-saccade":1})[0]
     subj_ids = {"SubjID":[subj_id for x in range(len(events))]}
     df = pd.DataFrame.from_dict(subj_ids)
-    epo = mne.Epochs(raw, events, tmin=-0.25, tmax=0.25, baseline=(None, None),
+    epo = mne.Epochs(raw, events, tmin=-0.25, tmax=0.25, baseline=(-0.25, -0.1),
                      reject={"eeg":250e-6}, metadata=df)
-    epo.save("{}{}-epo.fif".format(eeg_dir, subj_id), overwrite=True)
+    epo.save("{}{}-epo.fif".format(eeg_dir, subj_id[0]), overwrite=True)
     epos.append(epo)
 
     # get all the stats for the saccades
@@ -100,7 +99,6 @@ for filename in filenames:
     # evo.plot_joint(times=[min_time, max_time])
     # plt.figure()
     # plt.imshow(coef[:,0,peaks])
-    # breakpoint()
 
 # combine all epochs from all valid recordings into one large Epoch
 grand_epo = mne.concatenate_epochs(epos)

@@ -25,7 +25,7 @@ else:
     proc_dir = base_dir + "hdd/memtacs/proc/"
 
 
-l_freq, h_freq = 0.1, 250
+l_freq, h_freq = 0.3, 100
 overwrite = True
 
 filelist = listdir(raw_dir)
@@ -51,25 +51,24 @@ for filename in filelist:
             for k,v in chan_dict.items():
                 raw.set_channel_types({k:v})
 
-            if not do_reog:
-                # reference the EOG channels against each other, add that as
-                eog_v, eog_h, then drop the original channels
-                data = np.empty((0,len(raw)))
-                eog_v_picks = mne.pick_channels(raw.ch_names, include=["Vo", "Vu"])
-                temp_data = raw.get_data()[eog_v_picks,]
-                data = np.vstack((data, temp_data[0,] - temp_data[1,]))
-                eog_h_picks = mne.pick_channels(raw.ch_names, include=["Re", "Li"])
-                temp_data = raw.get_data()[eog_h_picks,]
-                data = np.vstack((data, temp_data[0,] - temp_data[1,]))
-                info = mne.create_info(["eog_v","eog_h"], sfreq=raw.info["sfreq"],
-                                       ch_types=["eog","eog"])
-                non_eeg = mne.io.RawArray(data, info)
-                raw.add_channels([non_eeg], force_update_info=True)
-                raw.drop_channels(orig_chans)
-
             # filter
             raw.filter(l_freq=l_freq, h_freq=h_freq)
-            raw.notch_filter(np.arange(50, 251, 50))
+            raw.notch_filter(np.arange(50, 500, 50), picks="all")
+
+            # reference the EOG channels against each other, add that as
+            # eog_v, eog_h
+            data = np.empty((0,len(raw)))
+            eog_v_picks = mne.pick_channels(raw.ch_names, include=["Vo", "Vu"])
+            temp_data = raw.get_data()[eog_v_picks,]
+            data = np.vstack((data, temp_data[0,] - temp_data[1,]))
+            eog_h_picks = mne.pick_channels(raw.ch_names, include=["Re", "Li"])
+            temp_data = raw.get_data()[eog_h_picks,]
+            data = np.vstack((data, temp_data[0,] - temp_data[1,]))
+            info = mne.create_info(["eog_v","eog_h"], sfreq=raw.info["sfreq"],
+                                   ch_types=["eog","eog"])
+            non_eeg = mne.io.RawArray(data, info)
+            raw.add_channels([non_eeg], force_update_info=True)
+
             # set default channels locations
             raw.set_montage("standard_1005")
             # detect bad channels
@@ -97,7 +96,7 @@ for filename in filelist:
             raw.interpolate_bads()
 
             # downsample to 250Hz
-            raw.resample(250, n_jobs=4)
+            #raw.resample(250, n_jobs=4)
 
             # save
             raw.save("{}{}_{}-raw.fif".format(proc_dir, subj_name, set_idx),
