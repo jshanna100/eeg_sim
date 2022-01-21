@@ -3,6 +3,7 @@ from mne.time_frequency import psd_welch
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
+from mayavi.mlab import points3d, plot3d, mesh, quiver3d, figure
 
 def sigma2freq(sigma_min, sigma_max, samp_len, point_n, resolution=250):
     freq_table = {}
@@ -131,3 +132,38 @@ def plot_samples(output, bands, ch_names, xlim=(-3.5, 3.5)):
             ax.plot(x, y)
             ax.set_xlim(xlim)
         plt.tight_layout()
+
+def draw_pair(points, size, color, fig):
+    points3d(points[:,0], points[:,1], points[:,2], scale_factor=size,
+             color=color, figure=fig)
+    plot3d(points[:,0], points[:,1], points[:,2],
+           tube_radius=None, color=color, figure=fig)
+
+def draw_eeg(info, size, color, fig):
+    hsp = mne.bem.get_fitting_dig(info)
+    for d_idx in range(len(hsp)):
+        points3d(hsp[d_idx, 0], hsp[d_idx, 1], hsp[d_idx, 2], scale_factor=size,
+                 color=color)
+
+def draw_sphere(R, r0, color, alpha, fig):
+    [phi, theta] = np.mgrid[0:2 * np.pi:12j, 0:np.pi:12j]
+    x = np.cos(phi) * np.sin(theta)
+    y = np.sin(phi) * np.sin(theta)
+    z = np.cos(theta)
+    return mesh(R * x + r0[0], R * y + r0[1], R * z + r0[2], color=color,
+                opacity=alpha, figure=fig)
+
+def get_rand_rrs(size, R, r0, z_excl=0.):
+    r_rr = np.zeros(size)
+    for r_idx in range(size[0]):
+        r_r = np.random.normal(size=(1, size[1]))
+        r_r /= np.sqrt(np.sum(r_r**2, axis=1, keepdims=True))
+        r_r *= 0.96 * R
+        r_r += r0
+        while r_r[0, -1] < z_excl:
+            r_r = np.random.normal(size=(1, size[1]))
+            r_r /= np.sqrt(np.sum(r_r**2, axis=1, keepdims=True))
+            r_r *= 0.96 * R
+            r_r += r0
+        r_rr[r_idx,] = r_r
+    return r_rr
