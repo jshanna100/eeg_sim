@@ -3,7 +3,7 @@ from mne.time_frequency import psd_welch
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
-from mayavi.mlab import points3d, plot3d, mesh, quiver3d, figure
+from mayavi.mlab import points3d, plot3d, mesh, quiver3d, figure, text3d
 
 def sigma2freq(sigma_min, sigma_max, samp_len, point_n, resolution=250):
     freq_table = {}
@@ -139,11 +139,18 @@ def draw_pair(points, size, color, fig):
     plot3d(points[:,0], points[:,1], points[:,2],
            tube_radius=None, color=color, figure=fig)
 
+def draw_point(point, size, color, fig, alpha=1):
+    points3d(point[0], point[1], point[2], scale_factor=size,
+             color=color, figure=fig, opacity=alpha)
+
 def draw_eeg(info, size, color, fig):
-    hsp = mne.bem.get_fitting_dig(info)
+    hsp = mne.bem.get_fitting_dig(info, dig_kinds="eeg", exclude_frontal=False)
     for d_idx in range(len(hsp)):
         points3d(hsp[d_idx, 0], hsp[d_idx, 1], hsp[d_idx, 2], scale_factor=size,
                  color=color)
+        if info.ch_names[d_idx] in ["Re", "Li", "Vo", "Vu", "Nose_ref"]:
+            text3d(hsp[d_idx, 0], hsp[d_idx, 1], hsp[d_idx, 2],
+                   info.ch_names[d_idx], scale=size)
 
 def draw_sphere(R, r0, color, alpha, fig):
     [phi, theta] = np.mgrid[0:2 * np.pi:12j, 0:np.pi:12j]
@@ -167,3 +174,23 @@ def get_rand_rrs(size, R, r0, z_excl=0.):
             r_r += r0
         r_rr[r_idx,] = r_r
     return r_rr
+
+def add_null_reference_chan(inst, ref_name):
+    # adds a zero channel under ref_name, for use with re-referencing
+    info = mne.create_info([ref_name], inst.info["sfreq"], ch_types="eeg")
+    if isinstance(inst, mne.BaseEpochs):
+        data = np.zeros((len(inst), 1, len(inst.times)))
+        chan_inst = mne.EpochsArray(data, info)
+    elif isinstance(inst, mne.io.BaseRaw):
+        data = np.zeros((1, len(inst)))
+        chan_inst = mne.io.RawArray(data, info)
+    inst.add_channels([chan_inst], force_update_info=True)
+    # build dictionary of channel positions
+    ch_pos = {}
+    for ch in inst.info["chs"]:
+        ch_pos[ch["ch_name"]] = ch["loc"][:3]
+    # nose coord is average of Re and Li x, and the y and z of Vu
+    ReLi_mu = np.mean([ch_pos["Re"][0], ch_pos["Li"][0]])
+    ch_pos[ref_name] = np.array([ReLi_mu, ch_pos["Vu"][1], ch_pos["Vu"][2]])
+    digmon = mne.channels.make_dig_montage(ch_pos=ch_pos)
+    inst = inst.set_montage(digmon)

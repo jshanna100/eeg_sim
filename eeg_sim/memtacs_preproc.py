@@ -45,11 +45,11 @@ for filename in filelist:
             except:
                 continue
 
-            # set the channel types, so MNE knows what they are
-            chan_dict = {"Vo":"eog","Vu":"eog","Re":"eog","Li":"eog"}
-            orig_chans = list(chan_dict.keys())
-            for k,v in chan_dict.items():
-                raw.set_channel_types({k:v})
+            # # set the channel types, so MNE knows what they are
+            # chan_dict = {"Vo":"eog","Vu":"eog","Re":"eog","Li":"eog"}
+            # orig_chans = list(chan_dict.keys())
+            # for k,v in chan_dict.items():
+            #     raw.set_channel_types({k:v})
 
             # filter
             raw.filter(l_freq=l_freq, h_freq=h_freq)
@@ -70,7 +70,7 @@ for filename in filelist:
             raw.add_channels([non_eeg], force_update_info=True)
 
             # set default channels locations
-            raw.set_montage("standard_1005")
+            #raw.set_montage("standard_1005")
             # detect bad channels
             picks = mne.pick_types(raw.info, eeg=True)
             bcf = BadChannelFind(picks, thresh=0.8)
