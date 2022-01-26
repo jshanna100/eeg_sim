@@ -6,7 +6,8 @@ import pickle
 import matplotlib.pyplot as plt
 from os.path import isdir
 from utils import (cnx_sample, build_band_samples, plot_samples,
-                   band_multivar_gauss_est, plot_covar_mats)
+                   band_multivar_gauss_est, plot_covar_mats,
+                   band_multivar_gauss_kl)
 from joblib import Parallel, delayed
 plt.ion()
 
@@ -65,8 +66,8 @@ src = mne.read_source_spaces("{}fsaverage-src.fif".format(eeg_dir))
 
 # fixed hyper-parameters
 subsampling = 1000 / raw.info["sfreq"]
-samp_n = 4
-n_jobs = 4
+samp_n = 32
+n_jobs = 8
 log = True
 
 cnx = cnx_dict["cnx"]
@@ -78,9 +79,14 @@ mod_params = {}
 mod_params["duration"]= 300 * 1000
 mod_params["dt"] = 0.5
 mod_params["sampling_dt"] = subsampling
-mod_params["K_gl"] = 0.6
+mod_params["K_gl"] = 1.38
 mod_params["delay"] = cnx_d
-mod_params["exc_ext"] = 0.4
+mod_params["exc_ext"] = 3.5
+mod_params["c_excexc"] = 25.42
+mod_params["c_exc_inc"] = 17.6
+mod_params["c_inhexc"] = 18.37
+mod_params["c_inhinh"] = 1.486
+mod_params["inh_ext"] = 3.987
 
 hcp_labels = mne.read_labels_from_annot("fsaverage", parc="HCP-MMP1",
                                     subjects_dir=subjects_dir)
@@ -108,3 +114,6 @@ plot_covar_mats(distros)
 
 with open("{}empirical_distro.pickle".format(mat_dir), "rb") as f:
     emp_distros = pickle.load(f)
+
+for idx, rraw in enumerate(raws):
+    rraw.save("{}Sim_{}-raw.fif".format(eeg_dir, idx))

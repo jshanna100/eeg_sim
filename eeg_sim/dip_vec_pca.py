@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.decomposition import PCA
 import mne
-from mne.simulation.raw import _SimForwards, _check_head_pos
+from mne.simulation.raw import _SimForwards, _check_head_pos, add_eog
 from os.path import isdir
 from os import listdir
 import matplotlib.pyplot as plt
@@ -156,12 +156,13 @@ raw.apply_proj()
 
 sacc_gen = SaccadeGenerator(dipoles, rates, 3, sph_pts)
 sacc_raw = sacc_gen.generate(raw, annotate=True)
+sacc_raw = add_eog(sacc_raw)
 
-epo = mne.read_epochs(eeg_dir+"102_2-epo.fif")
-epo.set_eeg_reference()
-epo.apply_proj()
-evo = epo.average()
-evo.plot_joint()
+# epo = mne.read_epochs(eeg_dir+"102_2-epo.fif")
+# epo.set_eeg_reference()
+# epo.apply_proj()
+# evo = epo.average()
+# evo.plot_joint()
 
 events, _ = mne.events_from_annotations(sacc_raw)
 epo_sim = mne.Epochs(sacc_raw, events, tmin=-0.25, tmax=0.25, baseline=None)

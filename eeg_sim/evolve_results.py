@@ -111,17 +111,11 @@ param_names = ["K_gl", "c_excexc", "c_excinh", "c_inhexc", "c_inhinh",
                "exc_ext", "inh_ext"]
 param_vals = [[0.05, 2], [4, 32], [4, 32], [4, 32], [0.05, 8], [0.05, 4],
               [0.05, 4]]
-param_vals = [[0.01, 64], [0.01, 64], [0.01, 64], [0.01, 64], [0.01, 64],
-              [0.01, 64], [0.01, 64]]
 
 pars = ParameterSpace(param_names, param_vals)
 evolution = Evolution(evalFunction=simulate_sample, parameterSpace=pars,
                       weightList=[-1.], model=model, POP_INIT_SIZE=opt.pop_init,
                       POP_SIZE=opt.pop, NGEN=opt.n_gen, ncores=n_jobs,
-                      filename = "",
-                      #filename="/scratch/jeffhanna/eeg_sim/test.hdf"
-                     )
-evolution.run()
-#evolution.saveEvolution()
-df = evolution.dfEvolution(outputs=False)
-df.to_pickle(mat_dir+"df_evo.pickle")
+                      filename="/home/jev/eeg_sim/mats/test.hdf")
+evolution.loadResults()
+#evolution.pop = evolution.toolbox.population(opt.pop_init)
