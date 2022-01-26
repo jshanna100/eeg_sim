@@ -41,7 +41,7 @@ def simulate_sample(traj):
     kls = band_multivar_gauss_kl(distros, q_distro)
     fitness = np.array(list(kls.values())).mean()
     fitness = (fitness, )
-    return fitness, model.outputs
+    return fitness, {}
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--pop_init', type=int, default=128)
