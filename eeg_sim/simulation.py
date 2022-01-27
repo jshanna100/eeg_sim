@@ -15,13 +15,19 @@ def simulate_eeg(mod_params, cnx, src, labels, fwd, info, scale_const,
                  noise_std, return_stc=False):
 
     subsampling = 1000 / info["sfreq"]
-    model = WCModel(Cmat=cnx, Dmat=mod_params["delay"])
-    for mp_k, mp_v in mod_params.items():
-        model.params[mp_k] = mp_v
-
     noise_std *= scale_const
-    model.run(chunkwise=True, append_outputs=True)
-    stc_data = model.exc * scale_const
+
+    stc_data = np.nan
+    tries = 0
+    while np.isnan(stc_data).any():
+        model = WCModel(Cmat=cnx, Dmat=mod_params["delay"])
+        for mp_k, mp_v in mod_params.items():
+            model.params[mp_k] = mp_v
+        print("Simulating: attempt {}".format(tries))
+        model.run(chunkwise=True, append_outputs=True)
+        stc_data = model.exc * scale_const
+        tries += 1
+
     tstep = model.params["sampling_dt"] / 1000
     stc = simulate_stc(src, labels, stc_data, tmin=0, tstep=tstep)
     stc.data += np.random.normal(0, noise_std, size=stc.data.shape)
@@ -67,7 +73,7 @@ src = mne.read_source_spaces("{}fsaverage-src.fif".format(eeg_dir))
 # fixed hyper-parameters
 subsampling = 1000 / raw.info["sfreq"]
 samp_n = 32
-n_jobs = 8
+n_jobs = 4
 log = True
 
 cnx = cnx_dict["cnx"]
@@ -78,15 +84,16 @@ bands = {"theta":(4,8), "alpha":(8,13), "beta":(13,31), "gamma":(30,100)}
 mod_params = {}
 mod_params["duration"]= 300 * 1000
 mod_params["dt"] = 0.5
-mod_params["sampling_dt"] = subsampling
-mod_params["K_gl"] = 1.38
 mod_params["delay"] = cnx_d
-mod_params["exc_ext"] = 3.5
-mod_params["c_excexc"] = 25.42
-mod_params["c_exc_inc"] = 17.6
-mod_params["c_inhexc"] = 18.37
-mod_params["c_inhinh"] = 1.486
-mod_params["inh_ext"] = 3.987
+mod_params["sampling_dt"] = subsampling
+mod_params["K_gl"] = 6.55
+mod_params["c_excexc"] = 16
+mod_params["c_excinh"] = 15
+mod_params["c_inhexc"] = 12
+mod_params["c_inhinh"] = 3
+mod_params["exc_ext"] = 1.58
+mod_params["inh_ext"] = 2.83
+mod_params['sigma_ou'] = 0.02
 
 hcp_labels = mne.read_labels_from_annot("fsaverage", parc="HCP-MMP1",
                                     subjects_dir=subjects_dir)

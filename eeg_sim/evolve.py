@@ -108,11 +108,10 @@ model.params["sampling_dt"] = subsampling
 
 
 param_names = ["K_gl", "c_excexc", "c_excinh", "c_inhexc", "c_inhinh",
-               "exc_ext", "inh_ext"]
-param_vals = [[0.05, 2], [4, 32], [4, 32], [4, 32], [0.05, 8], [0.05, 4],
-              [0.05, 4]]
-param_vals = [[0.01, 64], [0.01, 64], [0.01, 64], [0.01, 64], [0.01, 64],
-              [0.01, 64], [0.01, 64]]
+               "exc_ext", "inh_ext", "sigma_ou"]
+param_vals = [[0.5, 10], [10, 20], [10, 20], [10, 20], [0.05, 8], [0.5, 10],
+              [0.5, 10], [0.001, 0.05]]
+
 
 pars = ParameterSpace(param_names, param_vals)
 evolution = Evolution(evalFunction=simulate_sample, parameterSpace=pars,
