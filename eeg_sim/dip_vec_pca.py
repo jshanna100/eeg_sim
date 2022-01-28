@@ -69,8 +69,6 @@ class SaccadeGenerator():
 
     def generate(self, raw, annotate=False):
         info = raw.info
-        if info["sfreq"] != self.sfreq:
-            raise ValueError("Sampling rate of raw and dipoles do not match.")
         # set up the dipole time courses and overlay appropriate noise
         N = len(raw)
         dip = np.zeros((self.trans.shape[1], N))
@@ -125,12 +123,20 @@ class SaccadeGenerator():
         raw_array = np.dot(fwd["sol"]["data"], dip)
         new_info = raw.copy().pick_types(eeg=True).info
         sacc_raw = mne.io.RawArray(raw_array, new_info)
+
+        if info["sfreq"] != self.sfreq:
+            sacc_raw.resample(info["sfreq"])
+
+        raw.load_data()
+        raw._data += sacc_raw._data
+
         if annotate:
             times = raw.times[so_inds]
             for time in times:
-                sacc_raw.annotations.append(time, raw.times[sacc_dip.shape[1]],
-                                            "MicroSaccade")
-        return sacc_raw
+                raw.annotations.append(time, raw.times[sacc_dip.shape[1]],
+                                       "MicroSaccade")
+
+        return raw
 
 if isdir("/home/jev"):
     base_dir = "/home/jev/"
@@ -143,28 +149,16 @@ rates = np.load("{}rates.npy".format(mat_dir))
 dipoles = np.load("{}dipole_vecs.npy".format(mat_dir))
 sph_pts = np.load("{}sph_points.npy".format(mat_dir))
 
-# file_names = listdir(eeg_dir)
-# for file_name in file_names:
-#     if not re.search("\d-epo.fif", file_name):
-#         continue
-#     epo = mne.read_epochs(eeg_dir + file_name)
-
-raw = mne.io.Raw(eeg_dir+"MT-YG-102_2-raw.fif", preload=True)
-#add_null_reference_chan(raw, "Nose_ref")
-raw.set_eeg_reference()
-raw.apply_proj()
-
 sacc_gen = SaccadeGenerator(dipoles, rates, 3, sph_pts)
-sacc_raw = sacc_gen.generate(raw, annotate=True)
-sacc_raw = add_eog(sacc_raw)
 
-# epo = mne.read_epochs(eeg_dir+"102_2-epo.fif")
-# epo.set_eeg_reference()
-# epo.apply_proj()
-# evo = epo.average()
-# evo.plot_joint()
-
-events, _ = mne.events_from_annotations(sacc_raw)
-epo_sim = mne.Epochs(sacc_raw, events, tmin=-0.25, tmax=0.25, baseline=None)
-evo_sim = epo_sim.average()
-evo_sim.plot_joint()
+raw_n = 4
+noise_n = 8
+for raw_idx in range(raw_n):
+    raw = mne.io.Raw("{}Sim_{}-raw.fif".format(eeg_dir, raw_idx))
+    for noise_idx in range(noise_n):
+        this_raw = raw.copy()
+        sacc_gen.generate(this_raw, annotate=False)
+        add_eog(this_raw)
+        this_raw.save("{}Sim_{}_Noise_{}-raw.fif".format(eeg_dir, raw_idx,
+                                                         noise_idx),
+                                                         overwrite=True)

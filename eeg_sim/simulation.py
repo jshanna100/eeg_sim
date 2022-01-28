@@ -19,16 +19,18 @@ def simulate_eeg(mod_params, cnx, src, labels, fwd, info, scale_const,
 
     stc_data = np.nan
     tries = 0
-    while np.isnan(stc_data).any():
-        model = WCModel(Cmat=cnx, Dmat=mod_params["delay"])
-        for mp_k, mp_v in mod_params.items():
-            model.params[mp_k] = mp_v
-        print("Simulating: attempt {}".format(tries))
-        model.run(chunkwise=True, append_outputs=True)
-        stc_data = model.exc * scale_const
-        tries += 1
+    #while np.isnan(stc_data).any():
 
+    model = WCModel(Cmat=cnx, Dmat=mod_params["delay"])
+    for mp_k, mp_v in mod_params.items():
+        model.params[mp_k] = mp_v
+    print("Simulating: attempt {}".format(tries))
+    model.run(chunkwise=True, append_outputs=True)
+    stc_data = model.exc * scale_const
     tstep = model.params["sampling_dt"] / 1000
+    tries += 1
+    del model
+
     stc = simulate_stc(src, labels, stc_data, tmin=0, tstep=tstep)
     stc.data += np.random.normal(0, noise_std, size=stc.data.shape)
     raw_sim = mne.apply_forward_raw(fwd, stc, info)
@@ -73,7 +75,7 @@ src = mne.read_source_spaces("{}fsaverage-src.fif".format(eeg_dir))
 # fixed hyper-parameters
 subsampling = 1000 / raw.info["sfreq"]
 samp_n = 32
-n_jobs = 4
+n_jobs = 1
 log = True
 
 cnx = cnx_dict["cnx"]
@@ -122,5 +124,10 @@ plot_covar_mats(distros)
 with open("{}empirical_distro.pickle".format(mat_dir), "rb") as f:
     emp_distros = pickle.load(f)
 
+good_idx = 0
 for idx, rraw in enumerate(raws):
-    rraw.save("{}Sim_{}-raw.fif".format(eeg_dir, idx))
+    data = rraw.get_data()
+    if np.isnan(data).any():
+        continue
+    rraw.save("{}Sim_{}-raw.fif".format(eeg_dir, good_idx), overwrite=True)
+    good_idx += 1
