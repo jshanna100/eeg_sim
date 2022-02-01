@@ -24,22 +24,27 @@ elif isdir("/home/hannaj/"):
     base_dir = "/home/hannaj/"
 proc_dir = base_dir + "hdd/memtacs/proc/reog/"
 
-bands = {"delta":[1,4], "theta":[4,7], "alpha":[8,12], "beta":[13,31]}
+bands = {"delta":[1,4], "theta":[4,7], "alpha":[8,12], "beta":[13,31],
+         "low_gamma":[30, 45], "high_gamma":[55, 85]}
 ch_names = ['Fp1', 'AFz', 'Fp2', 'F7', 'F3', 'F4', 'Fz', 'F8', 'FC5', 'FC1',
             'FC2', 'FC6', 'T7', 'C3', 'Cz', 'C4', 'T8', 'CP5', 'CP1', 'CP2',
             'CP6', 'P7', 'P3', 'Pz', 'P4', 'P8', 'O1', 'O2']
 
 proclist = listdir(proc_dir)
-var_list = ch_names + list(bands.keys()) + ["Subj", "VarExpl"]
+meta_vars = ["Subj", "Chunk", "VarExpl", "Gamma", "CompIdx", "LocIdx"]
+var_list = meta_vars + ch_names + list(bands.keys())
 df_dict = {var:[] for var in var_list}
+all_comp_idx = 0
+sources = []
 for filename in proclist:
-    if not re.match("MT-.*-raw.fif", filename):
+    if not re.match("MT-.*_0-raw.fif", filename):
         continue
     raw = mne.io.Raw(proc_dir + filename, preload=True)
+    raw_gamma = raw.copy().filter(l_freq=30, h_freq=85)
     raw.filter(l_freq=1, h_freq=30)
 
     # get rid of obvious EOG components
-    ica = ICA(0.99)
+    ica = ICA(0.99, method="picard")
     ica.fit(raw)
     comps, scores = ica.find_bads_eog(raw, measure="correlation", threshold=0.8)
     raw_noeog = ica.apply(raw, exclude=comps)
@@ -47,33 +52,50 @@ for filename in proclist:
     # now mark off all the EOG channels so they're excluded
     chan_dict = {"Vo":"eog","Vu":"eog","Re":"eog","Li":"eog"}
     raw_noeog.set_channel_types(chan_dict)
+    raw_gamma.set_channel_types(chan_dict)
 
     # brain ica
-    ica_noeog = ICA(0.99)
-    ica_noeog.fit(raw_noeog)
+    chunks = np.arange(0, raw_noeog.times[-1], 30)
+    starts, ends = chunks[:-1], chunks[1:]
+    for t_idx, (start, end) in enumerate(zip(starts, ends)):
+        for is_gamma, which_raw in zip(["No", "Yes"], [raw_noeog, raw_gamma]):
+            this_raw = which_raw.copy().crop(start, end)
+            try:
+                this_ica = ICA(0.99, method="picard")
+                this_ica.fit(this_raw)
+            except:
+                this_ica = ICA(0.999, method="picard")
+                this_ica.fit(this_raw)
 
-    # get components
-    comps = np.dot(ica_noeog.mixing_matrix_.T,
-                   ica_noeog.pca_components_[:ica_noeog.n_components_])
+            # get components
+            comps = this_ica.get_components()
 
-    # spectral analysis for component sources
-    srcs = ica_noeog.get_sources(raw_noeog)
-    psd, freqs = psd_multitaper(srcs, picks=srcs.ch_names, fmin=1, fmax=30)
-    b_means = np.array(list(band_means(psd, freqs, bands).values())).T
-    breg = 1 / b_means.sum(axis=1)
-    b_means = np.dot(np.diag(breg), b_means)
+            # spectral analysis for component sources
+            srcs = this_ica.get_sources(this_raw)
+            psd, freqs = psd_multitaper(srcs, picks=srcs.ch_names, fmin=1, fmax=45)
+            b_means = np.array(list(band_means(psd, freqs, bands).values())).T
+            breg = 1 / b_means.sum(axis=1)
+            b_means = np.dot(np.diag(breg), b_means)
+            sources.append(srcs.get_data().astype(np.float32))
 
-    # ratio of explained variance
-    ratios = ica.pca_explained_variance_ / sum(ica.pca_explained_variance_)
-    ratios = ratios[:ica_noeog.n_components_]
+            # ratio of explained variance
+            ratios = this_ica.pca_explained_variance_ / sum(this_ica.pca_explained_variance_)
+            ratios = ratios[:this_ica.n_components_]
 
-    for comp_idx in range(ica_noeog.n_components_):
-        for ch_idx, ch in enumerate(ica_noeog.ch_names):
-            df_dict[ch].append(comps[comp_idx, ch_idx])
-        for band_idx, band in enumerate(list(bands.keys())):
-            df_dict[band].append(b_means[comp_idx, band_idx])
-        df_dict["Subj"].append(filename)
-        df_dict["VarExpl"].append(ratios[comp_idx])
+            for loc_idx, comp_idx in enumerate(range(this_ica.n_components_)):
+                for ch_idx, ch in enumerate(this_ica.ch_names):
+                    df_dict[ch].append(comps[ch_idx, comp_idx])
+                for band_idx, band in enumerate(list(bands.keys())):
+                    df_dict[band].append(b_means[comp_idx, band_idx])
+                df_dict["Subj"].append(filename)
+                df_dict["Chunk"].append(t_idx)
+                df_dict["VarExpl"].append(ratios[comp_idx])
+                df_dict["Gamma"].append(is_gamma)
+                df_dict["CompIdx"].append(all_comp_idx)
+                df_dict["LocIdx"].append(loc_idx)
+                all_comp_idx += 1
 
 df = pd.DataFrame.from_dict(df_dict)
 df.to_pickle("{}comp_vecs.pickle".format(proc_dir))
+sources = np.vstack(sources)
+np.save("{}comp_sources.npy".format(proc_dir), sources)
