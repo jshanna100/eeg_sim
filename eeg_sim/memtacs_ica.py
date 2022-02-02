@@ -7,6 +7,7 @@ from mne.preprocessing import ICA
 from mne.time_frequency import psd_multitaper
 import matplotlib.pyplot as plt
 import pandas as pd
+import pickle
 plt.ion()
 
 def band_means(psd, freqs, bands):
@@ -30,14 +31,20 @@ ch_names = ['Fp1', 'AFz', 'Fp2', 'F7', 'F3', 'F4', 'Fz', 'F8', 'FC5', 'FC1',
             'FC2', 'FC6', 'T7', 'C3', 'Cz', 'C4', 'T8', 'CP5', 'CP1', 'CP2',
             'CP6', 'P7', 'P3', 'Pz', 'P4', 'P8', 'O1', 'O2']
 
+# resting state only
+with open("{}resting_state_files.pickle".format(proc_dir), "rb") as f:
+    rests = pickle.load(f)
+
 proclist = listdir(proc_dir)
-meta_vars = ["Subj", "Chunk", "VarExpl", "Gamma", "CompIdx", "LocIdx"]
+meta_vars = ["Subj", "Chunk", "VarExpl", "Gamma", "CompIdx", "LocIdx",
+             "SrcIdx", "ICAFile"]
 var_list = meta_vars + ch_names + list(bands.keys())
 df_dict = {var:[] for var in var_list}
 all_comp_idx = 0
 sources = []
+src_idx = 0
 for filename in proclist:
-    if not re.match("MT-.*_0-raw.fif", filename):
+    if filename not in rests:
         continue
     raw = mne.io.Raw(proc_dir + filename, preload=True)
     raw_gamma = raw.copy().filter(l_freq=30, h_freq=85)
@@ -58,7 +65,7 @@ for filename in proclist:
     chunks = np.arange(0, raw_noeog.times[-1], 30)
     starts, ends = chunks[:-1], chunks[1:]
     for t_idx, (start, end) in enumerate(zip(starts, ends)):
-        for is_gamma, which_raw in zip(["No", "Yes"], [raw_noeog, raw_gamma]):
+        for is_gamma, which_raw in zip([False, True], [raw_noeog, raw_gamma]):
             this_raw = which_raw.copy().crop(start, end)
             try:
                 this_ica = ICA(0.99, method="picard")
@@ -72,7 +79,7 @@ for filename in proclist:
 
             # spectral analysis for component sources
             srcs = this_ica.get_sources(this_raw)
-            psd, freqs = psd_multitaper(srcs, picks=srcs.ch_names, fmin=1, fmax=45)
+            psd, freqs = psd_multitaper(srcs, picks=srcs.ch_names, fmin=1, fmax=85)
             b_means = np.array(list(band_means(psd, freqs, bands).values())).T
             breg = 1 / b_means.sum(axis=1)
             b_means = np.dot(np.diag(breg), b_means)
@@ -81,6 +88,12 @@ for filename in proclist:
             # ratio of explained variance
             ratios = this_ica.pca_explained_variance_ / sum(this_ica.pca_explained_variance_)
             ratios = ratios[:this_ica.n_components_]
+
+            if is_gamma:
+                ica_file = "{}_{}_gamma-ica.fif".format(filename[:-8], t_idx)
+            else:
+                ica_file = "{}_{}-ica.fif".format(filename[:-8], t_idx)
+            this_ica.save(proc_dir + ica_file)
 
             for loc_idx, comp_idx in enumerate(range(this_ica.n_components_)):
                 for ch_idx, ch in enumerate(this_ica.ch_names):
@@ -93,9 +106,12 @@ for filename in proclist:
                 df_dict["Gamma"].append(is_gamma)
                 df_dict["CompIdx"].append(all_comp_idx)
                 df_dict["LocIdx"].append(loc_idx)
+                df_dict["SrcIdx"].append(src_idx)
+                df_dict["ICAFile"].append(ica_file)
                 all_comp_idx += 1
+            src_idx += 1
 
 df = pd.DataFrame.from_dict(df_dict)
 df.to_pickle("{}comp_vecs.pickle".format(proc_dir))
-sources = np.vstack(sources)
+sources = np.array(sources, dtype=object)
 np.save("{}comp_sources.npy".format(proc_dir), sources)

@@ -11,11 +11,13 @@ plt.ion()
 import umap
 import matplotlib.colors as colors
 import pickle
+import hdbscan
 
 class Manifold():
     def __init__(self, data, fig, ax, dimen="2d", interact=True, cmap="PuRd",
                  cat_cmap=plt.cm.tab20, marksize=1, pickradius=2,
-                 col_dict=None, df=None):
+                 col_dict=None, df=None, label_with_subject=None,
+                 background=(0,0,0)):
         self.data = data
         self.fig = fig
         self.ax = ax
@@ -30,6 +32,9 @@ class Manifold():
             self.subjs = df["Subj"]
             self.subj_unq = list(df["Subj"].unique())
         self.df = df
+        self.label_with_subject = label_with_subject
+        self.background = background
+
         self.subj_mode = False
         self.cur_subj = None
         self.active_inds = None
@@ -52,8 +57,9 @@ class Manifold():
         else:
             self.draw(self.subj_unq[self.subj_unq.index(self.cur_subj)-1])
 
-    def draw(self, label, names=None):
+    def draw(self, label):
         self.ax.clear()
+        self.ax.set_facecolor(self.background)
         if label in self.col_dict.keys():
             # preprogrammed colour set
             cols = self.col_dict[label]
@@ -68,6 +74,7 @@ class Manifold():
                                 picker=self.interact,
                                 pickradius=self.pickradius)
             self.subj_mode = False
+            self.active_inds = np.arange(len(self.data))
         elif self.subjs is not None and label in self.subj_unq:
             ## highlight a subject
             cols = np.ones((len(self.data), 4)) * 0.05
@@ -76,8 +83,14 @@ class Manifold():
             var_expls = unit_range(np.log(self.df.iloc[row_inds]["VarExpl"].values))
             for abs_idx, row_idx in enumerate(row_inds):
                 # categorical colour
-                cols[row_idx,] = self.cat_cmap(self.df.iloc[row_idx]["Chunk"])
-                cols[row_idx, 3] = var_expls[abs_idx]
+                if self.label_with_subject is None:
+                    # colour by chunk
+                    cols[row_idx,] = self.cat_cmap(self.df.iloc[row_idx]["Chunk"])
+                    cols[row_idx, 3] = var_expls[abs_idx]
+                else:
+                    # colour by value of subject_label
+                    cols[row_idx,] = self.col_dict[self.label_with_subject][row_idx,]
+
             if self.dimen == "2d":
                 self.ax.scatter(self.data[row_inds,0], self.data[row_inds,1],
                                 c=cols[row_inds], cmap=self.cmap,
@@ -107,10 +120,41 @@ class Manifold():
         if self.interact:
             self.fig.canvas.mpl_connect("pick_event", onpick)
 
-        if self.subj_mode:
+        if self.subj_mode and self.label_with_subject is None:
             lines = [plt.Line2D([0], [0], color=self.cat_cmap(x), lw=4)
                      for x in range(20)]
             self.ax.legend(lines, ["Chunk {}".format(x) for x in np.arange(20)])
+
+    def onpick(self, event_ind):
+        for abs_idx, ica_idx in enumerate(event_ind):
+            row = df.iloc[self.active_inds[ica_idx],]
+            comp_vec = np.array([row[ch] for ch in inst.ch_names])
+            fig, axes = plt.subplots(1, 2, figsize=(19.2, 19.2))
+            plot_topomap(comp_vec, inst.info, axes=axes[0])
+            band_vec =  np.array([row[band] for band in ["delta", "theta", "alpha",
+                                                         "beta", "low_gamma",
+                                                         "high_gamma"]])
+            axes[1].bar(np.arange(6), band_vec)
+            axes[1].set_xticks(np.arange(6),
+                               labels=["delta", "theta", "alpha", "beta",
+                                       "low_gamma", "high_gamma"])
+            axes[0].set_title("({}) {}, {:.3f}, Chunk {}".format(abs_idx,
+                                                                 row["Subj"],
+                                                                 row["VarExpl"],
+                                                                 row["Chunk"]))
+            axes[1].set_ylim((0, 1))
+            plt.tight_layout()
+
+        # plot component sources
+        this_df = df.iloc[event_ind]
+        loc_inds, src_inds = this_df["LocIdx"].values, this_df["SrcIdx"].values
+        srcs = []
+        for loc_idx, src_idx in zip(loc_inds, src_inds):
+            srcs.append(sources[src_idx][loc_idx,])
+        srcs = np.array(srcs)
+        info = mne.create_info(len(srcs), inst.info["sfreq"])
+        raw = mne.io.RawArray(srcs, info)
+        raw.plot(scalings={"misc":10}, duration=5)
 
 class MplColorHelper:
   def __init__(self, cmap_name, start_val, stop_val):
@@ -126,30 +170,7 @@ def unit_range(x):
 
 def onpick(event):
     print(event.ind)
-    for abs_idx, ica_idx in enumerate(event.ind):
-        row = df.iloc[ica_idx,]
-        comp_vec = np.array([row[ch] for ch in inst.ch_names])
-        fig, axes = plt.subplots(1, 2, figsize=(19.2, 19.2))
-        plot_topomap(comp_vec, inst.info, axes=axes[0])
-        band_vec =  np.array([row[band] for band in ["delta", "theta", "alpha",
-                                                     "beta", "gamma"]])
-        axes[1].bar(np.arange(5), band_vec)
-        axes[1].set_xticks(np.arange(5),
-                           labels=["delta", "theta", "alpha", "beta", "gamma"])
-        axes[0].set_title("({}) {}, {:.3f}, Chunk {}".format(abs_idx,
-                                                             row["Subj"],
-                                                             row["VarExpl"],
-                                                             row["Chunk"]))
-        axes[1].set_ylim((0, 1))
-        plt.tight_layout()
-
-    # plot component sources
-    this_df = df.iloc[event.ind]
-    comp_inds = this_df["CompIdx"]
-    srcs = sources[comp_inds,]
-    info = mne.create_info(len(comp_inds), inst.info["sfreq"])
-    raw = mne.io.RawArray(srcs, info)
-    raw.plot(scalings="auto")
+    inter_obj.onpick(event.ind)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--gamma", action="store_true")
@@ -158,9 +179,8 @@ opt = parser.parse_args()
 
 n_nx = 100
 min_dist = .2
-do_gamma = False
 
-size = 0.2
+marksize = 2
 
 # Define directory. The if statements are here because I work on multiple
 # computers, and these automatically detect which one I'm using.
@@ -177,42 +197,19 @@ inst.set_channel_types(chan_dict)
 inst = inst.pick_types(eeg=True)
 
 df = pd.read_pickle("{}comp_vecs.pickle".format(proc_dir))
-df_chs = list(df.columns[5:-5])
+df_chs = list(df.columns[8:-6])
 if opt.gamma:
-    df = df[df["Gamma"]=="Yes"]
+    df = df[df["Gamma"]==True]
 else:
-    df = df[df["Gamma"]=="No"]
+    df = df[df["Gamma"]==False]
 
-# resting state only
-with open("{}resting_state_files.pickle".format(proc_dir), "rb") as f:
-    rests = pickle.load(f)
-subjs = df["Subj"].values
-row_inds = []
-for subj_idx, subj in enumerate(subjs):
-    if subj in rests:
-        row_inds.append(subj_idx)
-row_inds = np.array(row_inds)
-df = df.iloc[row_inds]
-
-data = df.iloc[:, 5:]
-
-## add local component info
-print("Adding local component info")
-chunks = df["Chunk"].values
-locs = np.zeros_like(chunks)
-breaks = np.where(~(chunks[:-1]==chunks[1:]))[0]
-cur_idx = 0
-for br in breaks:
-    locs[cur_idx:br] = np.arange(br-cur_idx)
-    cur_idx = br
-locs[cur_idx:] = np.arange(len(locs[cur_idx:]))
-df["LocIdx"] = locs
+data = df.iloc[:, 8:]
 
 # get component sources
 print("Loading component sources.")
-sources = np.load("{}comp_sources.npy".format("/home/jev/eeg_sim/mats/"))
+sources = np.load("{}comp_sources.npy".format(proc_dir), allow_pickle=True)
 
-print("UMAP 2d")
+print("UMAP 3d")
 reducer3d = umap.UMAP(n_components=3, n_neighbors=n_nx, min_dist=min_dist)
 trans3d = reducer3d.fit_transform(data.abs())
 
@@ -234,7 +231,7 @@ template = abs(template) # we are only interested in magnitude, not polarity
 # 0 to 1 range
 template = unit_range(template)
 # get comp data for all rows
-comps = abs(df.iloc[:, 5:-6].values)
+comps = abs(df.iloc[:, 8:-6].values)
 matches = np.dot(comps, template)
 # 0 to 1 range
 temp_match = unit_range(matches)
@@ -249,7 +246,7 @@ var_expl_rank = unit_range(var_expl)
 print("Spectral colours.")
 colget = MplColorHelper("Set3", 0, 12)
 spect_cols = np.zeros((len(df), 4), dtype=np.float64)
-band_data = df.iloc[:, -6:-1].values
+band_data = df.iloc[:, -6:].values
 band_data -= band_data.mean(axis=0) # mean centre
 # normalise to 0-1
 for col_idx in range(band_data.shape[1]):
@@ -263,16 +260,33 @@ for row_idx in range(len(band_data)):
         spect_cols[row_idx,] += colget.get_rgb(band_idx) * np.ones(4) * band
     spect_cols[spect_cols>1.] = 1
 
+
+# by hdbscan
+print("HDBSCAN clustering.")
+labs = hdbscan.HDBSCAN(min_cluster_size=100,
+                       min_samples=1).fit_predict(trans3d)
+h_cols = np.zeros((len(labs), 4))
+col_map = np.linspace(0., .8, labs.max()+1)
+for lab_idx, lab in enumerate(labs):
+    if lab == -1:
+        h_cols[lab_idx,] = np.ones(4) * 0.05
+    else:
+        h_cols[lab_idx,] = plt.cm.hsv(col_map[lab])
+
 col_dict = {"template":temp_match, "varexpl":var_expl_rank,
-            "spectral":spect_cols}
+            "spectral":spect_cols, "hdbscan":h_cols}
 
 fig2d, ax2d = plt.subplots()
 fig3d = plt.figure()
 ax3d = fig3d.add_subplot(projection='3d')
 
-man2d = Manifold(trans2d, fig2d, ax2d, col_dict=col_dict, df=df)
-man2d.draw("template")
+man2d = Manifold(trans2d, fig2d, ax2d, col_dict=col_dict, df=df,
+                 marksize=marksize, label_with_subject="hdbscan",
+                 cat_cmap=plt.cm.Set3, cmap="PuRd")
+man2d.draw("hdbscan")
+inter_obj = man2d
 
 man3d = Manifold(trans3d, fig3d, ax3d, dimen="3d", col_dict=col_dict, df=df,
-                 interact=False)
-man3d.draw("template")
+                 marksize=marksize, interact=False, cat_cmap=plt.cm.Set3,
+                 cmap="PuRd")
+man3d.draw("hdbscan")

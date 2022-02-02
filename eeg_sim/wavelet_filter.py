@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from os.path import isdir
 import pandas as pd
 from os import listdir
+import pickle
 import re
 plt.ion()
 
@@ -30,8 +31,12 @@ rates = []
 minmaxima = []
 freqs = []
 
+# resting state only
+with open("{}resting_state_files.pickle".format(eeg_dir), "rb") as f:
+    rests = pickle.load(f)
+
 for filename in filenames:
-    if "-raw.fif" not in filename:
+    if filename not in rests:
         continue
     match = re.search("MT-YG-(.*)-raw.fif", filename)
     subj_id = match.groups(1)
@@ -65,9 +70,7 @@ for filename in filenames:
     for peak in peaks:
         raw.annotations.append(raw.times[peak], 0, "Micro-saccade")
 
-    # setting this as a fixed number is a crude solution. would be better
-    # to set it as a rate (i.e. x per length of recording)
-    if len(peaks) < 2000:
+    if (len(peaks) / raw.times[1]) < 1:
         print("Fewer than 2000 micro-saccades; data likely faulty. Skipping.")
         continue
 

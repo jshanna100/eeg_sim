@@ -28,7 +28,7 @@ eeg_dir = base_dir+"hdd/memtacs/proc/reog/"
 mat_dir = base_dir+"eeg_sim/mats/"
 img_dir = eeg_dir+"anim/"
 
-calc = True
+calc = False
 
 loc_time = (-0.01, 0.01)
 #loc_time = (0.01, 0.05)
@@ -39,15 +39,11 @@ lambda2_evo = 1.0 / 3.0 ** 2
 lambda2_epo = 1.0 / 3.0 ** 2
 
 if calc:
-    # # random points on a unit sphere
-    # pts_n = 3000
-    # sph_pts = np.random.normal(0, 1, size=(pts_n, 3))
-    # sph_pts = sph_pts / np.linalg.norm(sph_pts, axis=1)[:, np.newaxis]
-    # # eliminate points where we're not interested in searching
-    # sph_pts = sph_pts[sph_pts[:,2]>-.8]
-    # sph_pts = sph_pts[sph_pts[:,2]<-.2]
-    # sph_pts = sph_pts[sph_pts[:,1]>.6]
-    # exg_rr = sph_pts
+    # resting state only
+    with open("{}resting_state_files.pickle".format(eeg_dir), "rb") as f:
+        rests = pickle.load(f)
+    # reconfig for epo
+    rests = [x[6:-8] + "-epo.fif" for x in rests]
 
     sd = 2.8
     Z = -.5
@@ -55,14 +51,14 @@ if calc:
                        [-np.cos(np.pi / sd), np.sin(np.pi / sd), Z]])
     og_exg_rr /= np.sqrt(np.sum(og_exg_rr**2, axis=1, keepdims=True))
 
-    file_names = listdir(eeg_dir)
+    filenames = listdir(eeg_dir)
     expls = []
     ests = []
     vecs = []
-    for file_name in file_names:
-        if not re.search("\d-epo.fif", file_name):
+    for filename in filenames:
+        if filename not in rests:
             continue
-        epo = mne.read_epochs(eeg_dir + file_name)
+        epo = mne.read_epochs(eeg_dir + filename)
         #add_null_reference_chan(epo, "Nose_ref")
         epo.set_eeg_reference(projection=True)
         cov = mne.compute_covariance(epo.copy().crop(tmin=-0.2, tmax=-0.15))
@@ -83,18 +79,6 @@ if calc:
 
         # translate to our sphere
         exg_rr = r0[np.newaxis, :] + og_exg_rr * (R * 0.96) # originally 0.96
-        # random orientations; will be allowed to vary with localisation anyway
-        exg_nn = np.random.randn(*exg_rr.shape)
-        exg_nn = (exg_nn.T / np.linalg.norm(exg_nn, axis=1)).T
-
-        # # viz all points
-        # fig = figure("all dipoles")
-        # draw_sphere(R, r0, (0,0,1), 0.1, fig)
-        # draw_eeg(evo.info, 0.01, (0,0,0), fig)
-        # for idx in range(len(exg_rr)):
-        #     draw_point(exg_rr[idx]*0.95, 0.005, (1,0,0), fig)
-
-        ## localise epochs
         # random orientations; will be allowed to vary with localisation anyway
         exg_nn = np.random.randn(*exg_rr.shape)
         exg_nn = (exg_nn.T / np.linalg.norm(exg_nn, axis=1)).T
@@ -131,21 +115,6 @@ if calc:
             stc, resid = mixed_norm(evo, fwd, cov, pick_ori="vector",
                                     return_residual=True)
 
-
-        # # find strongest amplitude
-        # normed = np.linalg.norm(stc.data, axis=1)
-        # max_idx = np.argmax(normed.mean(axis=0), axis=0)
-        # # get inds for strongest n points
-        # big_inds = np.argsort(normed[:, max_idx])[-100:]
-        # # scaling for alpha
-        # min, max = normed[big_inds[0], max_idx], normed[big_inds[-1], max_idx]
-        # # # draw dipoles
-        # fig = figure(file_name)
-        # draw_eeg(evo.info, 0.01, (0,0,0), fig)
-        # draw_sphere(R, r0, (0,0,1), 0.1, fig)
-        # for idx in big_inds:
-        #     alpha = (normed[idx, max_idx] - min) / (max - min)
-        #     draw_point(exg_rr[idx,], 0.01, (1,0,0), fig, alpha=alpha)
 
     vecs = np.vstack(vecs)
     np.save("{}dipole_vecs.npy".format(mat_dir), vecs)

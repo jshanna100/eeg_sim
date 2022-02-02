@@ -3,7 +3,7 @@ from mne.time_frequency import psd_welch
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
-#from mayavi.mlab import points3d, plot3d, mesh, quiver3d, figure, text3d
+from mayavi.mlab import points3d, plot3d, mesh, quiver3d, figure, text3d
 
 def sigma2freq(sigma_min, sigma_max, samp_len, point_n, resolution=250):
     freq_table = {}
