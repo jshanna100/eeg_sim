@@ -177,8 +177,8 @@ parser.add_argument("--gamma", action="store_true")
 parser.add_argument("--label", type=str, default="cluster")
 opt = parser.parse_args()
 
-n_nx = 100
-min_dist = .2
+n_nx = 500
+min_dist = .02
 
 marksize = 2
 
@@ -224,10 +224,13 @@ print("Calculating template matches.")
 twin = [-0.01, 0]
 twin_inds = inst.time_as_index(twin)
 template = inst.data[:, twin_inds[0]:twin_inds[1]].mean(axis=1)
+
 # make sure channel ordering is correct
 chan_inds = np.array([inst.ch_names.index(ch) for ch in df_chs])
 template = template[chan_inds, ]
+
 template = abs(template) # we are only interested in magnitude, not polarity
+
 # 0 to 1 range
 template = unit_range(template)
 # get comp data for all rows
@@ -262,9 +265,15 @@ for row_idx in range(len(band_data)):
 
 
 # by hdbscan
-print("HDBSCAN clustering.")
-labs = hdbscan.HDBSCAN(min_cluster_size=100,
-                       min_samples=1).fit_predict(trans3d)
+clusterer = hdbscan.HDBSCAN(min_cluster_size=200,
+                            cluster_selection_method="leaf",
+                            prediction_data=True, min_samples=2).fit(trans3d)
+hard_labs = clusterer.labels_
+soft_probs = hdbscan.all_points_membership_vectors(clusterer)
+soft_labs = np.argmax(soft_probs, axis=1)
+
+labs = soft_labs
+
 h_cols = np.zeros((len(labs), 4))
 col_map = np.linspace(0., .8, labs.max()+1)
 for lab_idx, lab in enumerate(labs):
@@ -290,3 +299,47 @@ man3d = Manifold(trans3d, fig3d, ax3d, dimen="3d", col_dict=col_dict, df=df,
                  marksize=marksize, interact=False, cat_cmap=plt.cm.Set3,
                  cmap="PuRd")
 man3d.draw("hdbscan")
+
+## prepare statistics for later sampling
+
+# which cluster is the EOG cluster?
+labs_unq = np.unique(labs)
+labs_unq = labs_unq[labs_unq!=-1]
+temp_match_means = []
+for lab in labs_unq:
+    lab_inds = labs == lab
+    temp_match_means.append(np.mean(temp_match[lab_inds]))
+temp_match_means = np.array(temp_match_means)
+if any(temp_match_means>.5):
+    eog_labs = list(np.where(temp_match_means>.5)[0])
+else:
+    eog_labs = [np.argmax(temp_match_means)]
+
+# distribution of clusters across recordings
+src_unq = np.unique(df["SrcIdx"].values)
+
+for eog_lab in eog_labs:
+    labs[labs==eog_lab] = -1 # mark off the eog clusters
+
+counts = {x:[] for x in np.unique(labs)}
+for src_idx in src_unq:
+    df_inds = np.where((df["SrcIdx"]==src_idx).values)[0]
+    unqs, cnts = np.unique(labs[df_inds], return_counts=True)
+    unqcount = {u:c for u, c in zip(unqs, cnts)}
+    for k, v in counts.items():
+        if k in unqcount:
+            counts[k].append(unqcount[k])
+        else:
+            counts[k].append(0)
+df_counts = pd.DataFrame.from_dict(counts)
+
+
+this_df = df.copy()
+this_df["Cluster"] = labs
+
+# if opt.gamma:
+#     this_df.to_pickle("{}comp_vecs_clust_gamma.pickle".format(proc_dir))
+#     df_counts.to_pickle("{}comp_vecs_clust_counts_gamma.pickle".format(proc_dir))
+# else:
+#     this_df.to_pickle("{}comp_vecs_clust.pickle".format(proc_dir))
+#     df_counts.to_pickle("{}comp_vecs_clust_counts.pickle".format(proc_dir))

@@ -107,5 +107,7 @@ for filename in filenames:
 grand_epo = mne.concatenate_epochs(epos)
 grand_epo.reset_drop_log_selection()
 grand_epo.save("{}grand_saccade-epo.fif".format(eeg_dir), overwrite=True)
+evo = grand_epo.average()
+evo.save("{}grand_saccade-ave.fif".format(eeg_dir), overwrite=True)
 rates = np.array(rates)
 np.save("{}rates.npy".format(eeg_dir), rates)

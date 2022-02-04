@@ -101,7 +101,7 @@ class SaccadeGenerator():
                                            verbose=False)
 
         # eyeball dipole locations
-        exg_rr = self.sph_pts
+        exg_rr = self.sph_pts.copy()
         # translate to this subject's space
         exg_rr /= np.sqrt(np.sum(exg_rr**2, axis=1, keepdims=True))
         exg_rr *= 0.96 * R
@@ -149,16 +149,33 @@ rates = np.load("{}rates.npy".format(mat_dir))
 dipoles = np.load("{}dipole_vecs.npy".format(mat_dir))
 sph_pts = np.load("{}sph_points.npy".format(mat_dir))
 
+evo = mne.read_evokeds("{}grand_saccade-ave.fif".format(eeg_dir))[0]
+chan_dict = {"Vo":"eog","Vu":"eog","Re":"eog","Li":"eog"}
+evo.set_channel_types(chan_dict)
+evo.set_eeg_reference()
+
 sacc_gen = SaccadeGenerator(dipoles, rates, 3, sph_pts)
 
-raw_n = 4
-noise_n = 8
+# raw_sim = mne.io.Raw("{}sim_brain_0-raw.fif".format(eeg_dir))
+# raw_sim.set_montage("standard_1005")
+# sacc_gen.generate(raw_sim, annotate=True)
+# events, _ = mne.events_from_annotations(raw_sim)
+# events[:, 0] += raw_sim.time_as_index(0.01)[0]
+# epo_sim = mne.Epochs(raw_sim, events, baseline=None, tmin=-0.2, tmax=0.2)
+# evo_sim = epo_sim.average()
+# evo_sim.set_eeg_reference()
+
+raw_n = 10
+noise_n = 10
 for raw_idx in range(raw_n):
-    raw = mne.io.Raw("{}Sim_{}-raw.fif".format(eeg_dir, raw_idx))
+    raw = mne.io.Raw("{}sim_brain_{}-raw.fif".format(eeg_dir, raw_idx),
+                     preload=True)
+    raw.set_montage("standard_1005")
+    raw.set_eeg_reference()
     for noise_idx in range(noise_n):
         this_raw = raw.copy()
-        sacc_gen.generate(this_raw, annotate=False)
+        sacc_gen.generate(this_raw, annotate=True)
         add_eog(this_raw)
-        this_raw.save("{}Sim_{}_Noise_{}-raw.fif".format(eeg_dir, raw_idx,
-                                                         noise_idx),
-                                                         overwrite=True)
+        this_raw.save("{}sim_brain_{}_noise_{}-raw.fif".format(eeg_dir, raw_idx,
+                                                               noise_idx),
+                                                               overwrite=True)
