@@ -74,6 +74,7 @@ for filename in filenames:
         print("Fewer than 2000 micro-saccades; data likely faulty. Skipping.")
         continue
 
+    raw.save("{}{}_marked-raw.fif".format(eeg_dir, subj_id[0]), overwrite=True)
     # convert raw to epoched file, while also creating a pandas dataframe
     # as metadata, for potentially added convenience later
     events = mne.events_from_annotations(raw, event_id={"Micro-saccade":1})[0]
@@ -108,6 +109,6 @@ grand_epo = mne.concatenate_epochs(epos)
 grand_epo.reset_drop_log_selection()
 grand_epo.save("{}grand_saccade-epo.fif".format(eeg_dir), overwrite=True)
 evo = grand_epo.average()
-evo.save("{}grand_saccade-ave.fif".format(eeg_dir), overwrite=True)
+evo.save("{}grand_saccade-ave.fif".format(eeg_dir))
 rates = np.array(rates)
 np.save("{}rates.npy".format(eeg_dir), rates)
