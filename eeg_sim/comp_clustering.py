@@ -196,7 +196,7 @@ chan_dict = {"Vo":"eog","Vu":"eog","Re":"eog","Li":"eog"}
 inst.set_channel_types(chan_dict)
 inst = inst.pick_types(eeg=True)
 
-df = pd.read_pickle("{}comp_vecs.pickle".format(proc_dir))
+df = pd.read_pickle("{}comp_vecs_spoc_cleaned.pickle".format(proc_dir))
 df_chs = list(df.columns[8:-6])
 if opt.gamma:
     df = df[df["Gamma"]==True]
